@@ -1,0 +1,13 @@
+project/
+├── original_data/
+│   ├── 7.csv ... 11.csv
+├── data/
+│   ├── after_geo.csv
+│   └── geocode_cache.csv
+├── src/
+│   ├── __init__.py
+│   ├── io_loader.py        # 7~11 로드
+│   ├── preprocess.py       # 주소 정리
+│   ├── naver_geocode.py    # 네이버 호출 + 캐시 관리
+│   └── pipeline_geo.py     # geo() = 위 모듈들 묶기
+└── main.py                 # geo() 호출만
