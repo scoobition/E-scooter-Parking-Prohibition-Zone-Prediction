@@ -1,7 +1,7 @@
 import os
 from src.io_loader import load_months
 from src.preprocess import clean_address
-from src.naver_geocode import fill_cache_for_addresses
+from src.google_geocode import fill_cache_for_addresses
 
 def geo(
     input_dir="original_data",
