@@ -8,6 +8,8 @@ load_dotenv(BASE_DIR / ".env")
 
 from src.pipeline_geo import geo
 from src.grid import make_predata_and_meta_csv
+from src.viz_grid_map import make_monthly_heatmaps
+from src.result import make_result
 
 def run_step(cmd):
     print(f"\n[RUN] {' '.join(cmd)}")
@@ -17,6 +19,7 @@ def run_step(cmd):
         sys.exit(1)
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     print("\n=== GEO / GRID PIPELINE ===")
     # geo()  # 필요할 때만 활성화
     # make_predata_and_meta_csv()
@@ -27,3 +30,9 @@ if __name__ == "__main__":
     run_step([sys.executable, "src/predict_rf.py"])
 
     print("\n[DONE] 전체 파이프라인 완료")
+=======
+    # geo()
+    # make_predata_and_meta_csv()
+    # make_monthly_heatmaps(opacity=0.5, out_dir="map")
+    make_result()
+>>>>>>> map
