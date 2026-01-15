@@ -1,40 +1,58 @@
 import pandas as pd
 import joblib
+from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
+from typing import Sequence, List
 
-DATA_PATH = "data/features.csv"
-MODEL_PATH = "model_rf.pkl"
 
-if __name__ == "__main__":
-    # 1. 데이터 로드
-    df = pd.read_csv(DATA_PATH)
+def train_rf(
+    data_path: str = "data/features.csv",
+    model_path: str = "model_rf.pkl",
+    train_months: Sequence[int] = (9, 10),
+    feature_cols: Sequence[str] = ("count_t", "count_t-1", "count_t-2"),
+    n_estimators: int = 300,
+    max_depth: int = 8,
+    random_state: int = 42,
+) -> Path:
+    """RandomForestRegressor 학습 후 모델 저장.
 
-    # 2. 학습에 쓸 월만 선택 (9, 10월)
-    train = df[df["month"].isin([9, 10])].copy()
+    - 학습 데이터: month in train_months
+    - 타깃 y: 같은 grid_id에서 '다음 달' count_t (shift(-1))
+    """
+    df = pd.read_csv(data_path)
 
-    # 3. 정답(y) = 다음 달 count
-    train["y"] = train.groupby("grid_id")["count"].shift(-1)
+    missing = set(["month", "grid_id", "count_t", *feature_cols]) - set(df.columns)
+    if missing:
+        raise KeyError(f"features.csv에 필요한 컬럼이 없습니다: {sorted(missing)}")
 
-    # 4. 결측 제거
-    train = train.dropna(subset=["count_t", "count_t-1", "count_t-2", "y"])
+    train = df[df["month"].isin(list(train_months))].copy()
+    if train.empty:
+        raise ValueError(f"train_months={list(train_months)}에 해당하는 학습 데이터가 없습니다.")
 
-    # 5. X, y 분리
-    X = train[["count_t", "count_t-1", "count_t-2"]]
-    y = train["y"]
+    # y = 다음 달 count_t
+    train["y"] = train.groupby("grid_id")["count_t"].shift(-1)
+    train = train.dropna(subset=["y", *feature_cols]).copy()
 
-    print(f"[INFO] 학습 샘플 수: {len(X)}")
+    X = train[list(feature_cols)]
+    y = train["y"].astype(float)
 
-    # 6. 랜덤 포레스트 모델 정의
     model = RandomForestRegressor(
-        n_estimators=300, # 트리 개수
-        max_depth=8, # 트리 깊이 제한
-        random_state=42,
-        n_jobs=-1
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        random_state=random_state,
+        n_jobs=-1,
     )
-
-    # 7. 학습
     model.fit(X, y)
 
-    # 8. 모델 저장
-    joblib.dump(model, MODEL_PATH)
-    print(f"[DONE] 모델 저장 완료: {MODEL_PATH}")
+    out_p = Path(model_path)
+    joblib.dump(model, out_p)
+    print(f"[DONE] 모델 저장: {out_p}")
+    return out_p
+
+
+def main():
+    train_rf()
+
+
+if __name__ == "__main__":
+    main()

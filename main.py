@@ -10,13 +10,20 @@ from src.pipeline_geo import geo
 from src.grid import make_predata_and_meta_csv
 from src.viz_grid_map import make_monthly_heatmaps
 from src.result import make_result
+from src.make_features import make_features
+from src.train_rf import train_rf
+from src.predict_rf import predict_rf
+from src.visualize_pred import visualize_pred
+from src.reverse_geocode_top10 import reverse_geocode_top10
 
-def run_step(cmd):
-    print(f"\n[RUN] {' '.join(cmd)}")
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        print("[ERROR] 파이프라인 중단")
-        sys.exit(1)
+
+def ml_pipeline():
+    """ML 파이프라인: features -> train -> predict"""
+    make_features()
+    train_rf()
+    predict_rf()
+    visualize_pred(show=True)  # 원하면 주석 해제
+    reverse_geocode_top10()   # 원하면 주석 해제
 
 if __name__ == "__main__":
     print("\n=== GEO / GRID PIPELINE ===")
@@ -24,11 +31,4 @@ if __name__ == "__main__":
     # make_predata_and_meta_csv()
     # make_monthly_heatmaps(opacity=0.5, out_dir="map")
     # make_result()
-
-    print("\n=== ML PIPELINE ===")
-    run_step([sys.executable, "src/make_features.py"])
-    run_step([sys.executable, "src/train_rf.py"])
-    run_step([sys.executable, "src/predict_rf.py"])
-
-    print("\n[DONE] 전체 파이프라인 완료")
-    
+    ml_pipeline()

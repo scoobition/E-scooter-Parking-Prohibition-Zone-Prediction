@@ -1,36 +1,44 @@
 import pandas as pd
 import joblib
+from pathlib import Path
+from typing import Sequence
 
-DATA_PATH = "data/features.csv"
-MODEL_PATH = "model_rf.pkl"
-OUT_PATH = "data/pred_12.csv"
+
+def predict_rf(
+    data_path: str = "data/features.csv",
+    model_path: str = "model_rf.pkl",
+    out_path: str = "data/pred_12.csv",
+    pred_month: int = 11,
+    feature_cols: Sequence[str] = ("count_t", "count_t-1", "count_t-2"),
+    out_col: str = "pred_12",
+) -> Path:
+    """학습된 모델로 특정 월(pred_month)을 입력으로 다음 달(out_col) 예측 결과 저장."""
+    df = pd.read_csv(data_path)
+    model = joblib.load(model_path)
+
+    pred_df = df[df["month"] == pred_month].copy()
+    if pred_df.empty:
+        raise ValueError(f"pred_month={pred_month}에 해당하는 행이 없습니다. features 생성/월 선택을 확인하세요.")
+
+    missing = set(feature_cols) - set(pred_df.columns)
+    if missing:
+        raise KeyError(f"예측 입력에 필요한 feature 컬럼이 없습니다: {sorted(missing)}")
+
+    X_pred = pred_df[list(feature_cols)]
+    print(f"[INFO] 예측 대상 격자 수: {len(X_pred)} (month={pred_month})")
+
+    pred_df[out_col] = model.predict(X_pred)
+
+    out_p = Path(out_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    pred_df[["grid_id", out_col]].to_csv(out_p, index=False)
+    print(f"[DONE] 예측 결과 저장: {out_p}")
+    return out_p
+
+
+def main():
+    predict_rf()
+
 
 if __name__ == "__main__":
-    # 1. 데이터 로드
-    df = pd.read_csv(DATA_PATH)
-
-    # 2. 학습된 모델 로드
-    model = joblib.load(MODEL_PATH)
-
-    # 3. 12월 예측에 쓸 입력 (month == 11)
-    pred_df = df[df["month"] == 11].copy()
-
-    # 결측 남아있으면 제거
-    pred_df = pred_df.dropna(
-        subset=["count_t", "count_t-1", "count_t-2"]
-    )
-
-    # 4. 입력 X 구성
-    X_pred = pred_df[["count_t", "count_t-1", "count_t-2"]]
-
-    print(f"[INFO] 12월 예측 대상 격자 수: {len(X_pred)}")
-
-    # 5. 예측
-    pred_df["pred_12"] = model.predict(X_pred)
-
-    # 6. 결과 저장
-    pred_df[["grid_id", "pred_12"]].to_csv(
-        OUT_PATH, index=False
-    )
-
-    print(f"[DONE] 12월 예측 결과 저장: {OUT_PATH}")
+    main()

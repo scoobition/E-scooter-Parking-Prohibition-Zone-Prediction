@@ -4,109 +4,97 @@ import requests
 from pyproj import Transformer
 from dotenv import load_dotenv
 from pathlib import Path
+from typing import Optional, Tuple, List
 
-# =========================
-# .env 강제 로드 (프로젝트 루트)
-# =========================
+# 프로젝트 루트(.env) 로드: (현재 파일이 src/ 아래에 있다는 가정)
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
-
 load_dotenv(dotenv_path=ENV_PATH)
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
-if GOOGLE_API_KEY is None:
-    raise RuntimeError(f"GOOGLE_MAPS_API_KEY not found in {ENV_PATH}")
 
-
-# =========================
-# 파일 경로
-# =========================
 PRED_PATH = "data/pred_12.csv"
 META_PATH = "data/grid_meta.csv"
+OUT_PATH = "data/top10_with_address.csv"
+
+# grid_meta.csv가 EPSG:5179(한국 TM) 계열의 meter 좌표를 갖고 있다고 가정
+transformer = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
 
 
-# =========================
-# 좌표 변환기 (EPSG:5179 → WGS84)
-# =========================
-transformer = Transformer.from_crs(
-    "EPSG:5179", "EPSG:4326", always_xy=True
-)
-
-
-# =========================
-# 데이터 로드
-# =========================
-def load_and_merge():
-    pred = pd.read_csv(PRED_PATH)
-    meta = pd.read_csv(META_PATH)
-
+def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd.DataFrame:
+    pred = pd.read_csv(pred_path)
+    meta = pd.read_csv(meta_path)
     df = pred.merge(meta, on="grid_id", how="left")
     df = df.dropna(subset=["center_x_m", "center_y_m", "pred_12"]).copy()
     return df
 
 
-# =========================
-# 좌표 변환
-# =========================
-def to_latlon(x, y):
-    lon, lat = transformer.transform(x, y)
-    return lat, lon
+def to_latlon(x_m: float, y_m: float) -> Tuple[float, float]:
+    lon, lat = transformer.transform(x_m, y_m)
+    return float(lat), float(lon)
 
 
-# =========================
-# Google Reverse Geocoding
-# =========================
-def google_reverse_geocode(lat, lon):
+def reverse_geocode(lat: float, lon: float, api_key: str, timeout: float = 8.0) -> Optional[str]:
     url = "https://maps.googleapis.com/maps/api/geocode/json"
-    params = {
-        "latlng": f"{lat},{lon}",
-        "key": GOOGLE_API_KEY,
-        "language": "ko"
-    }
-
-    r = requests.get(url, params=params, timeout=5)
-    if r.status_code != 200:
+    params = {"latlng": f"{lat},{lon}", "key": api_key, "language": "ko"}
+    try:
+        r = requests.get(url, params=params, timeout=timeout)
+        r.raise_for_status()
+        data = r.json()
+        if data.get("status") != "OK":
+            return None
+        results = data.get("results") or []
+        if not results:
+            return None
+        return results[0].get("formatted_address")
+    except Exception:
         return None
 
-    data = r.json()
-    if not data.get("results"):
-        return None
 
-    # 가장 상세한 주소 하나 사용
-    return data["results"][0]["formatted_address"]
+def reverse_geocode_top10(
+    pred_path: str = PRED_PATH,
+    meta_path: str = META_PATH,
+    out_path: str = OUT_PATH,
+    topn: int = 10,
+) -> Path:
+    df = load_and_merge(pred_path, meta_path)
 
+    top = df.sort_values("pred_12", ascending=False).head(topn).copy()
+    top = top.reset_index(drop=True)
 
-# =========================
-# 메인 로직
-# =========================
-def main():
-    df = load_and_merge()
+    if not GOOGLE_API_KEY:
+        raise RuntimeError(
+            "GOOGLE_MAPS_API_KEY 환경변수가 필요합니다. (.env 또는 환경변수에 설정)"
+        )
 
-    # Top-10 격자 추출
-    top10 = df.sort_values("pred_12", ascending=False).head(10).copy()
-    top10 = top10.reset_index(drop=True)
-    top10.index += 1
+    lats: List[float] = []
+    lons: List[float] = []
+    addrs: List[Optional[str]] = []
 
-    lats, lons, addresses = [], [], []
-
-    for x, y in zip(top10["center_x_m"], top10["center_y_m"]):
-        lat, lon = to_latlon(x, y)
-        addr = google_reverse_geocode(lat, lon)
-
+    for _, row in top.iterrows():
+        lat, lon = to_latlon(float(row["center_x_m"]), float(row["center_y_m"]))
         lats.append(lat)
         lons.append(lon)
-        addresses.append(addr)
+        addrs.append(reverse_geocode(lat, lon, GOOGLE_API_KEY))
 
-    top10["lat"] = lats
-    top10["lon"] = lons
-    top10["address"] = addresses
+    top["lat"] = lats
+    top["lon"] = lons
+    top["address"] = addrs
 
-    print("\n[TOP 10 HIGH-RISK GRIDS WITH ADDRESS]")
-    print(top10[["grid_id", "pred_12", "address"]])
+    out_p = Path(out_path)
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    top[["grid_id", "pred_12", "lat", "lon", "address"]].to_csv(out_p, index=False)
+
+    print("\n[TOP GRID ADDRESS SAVED]")
+    print(top[["grid_id", "pred_12", "address"]])
+
+    print(f"[DONE] top{topn} 주소 결과 저장: {out_p}")
+    return out_p
 
 
-# =========================
-# 실행
-# =========================
+def main():
+    reverse_geocode_top10()
+
+
 if __name__ == "__main__":
     main()
