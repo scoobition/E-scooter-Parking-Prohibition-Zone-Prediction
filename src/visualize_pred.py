@@ -62,6 +62,15 @@ def plot_grid_heatmap(
         )
         ax.add_patch(rect)
 
+    # ===== [핵심 추가] 축 범위를 데이터 기준으로 설정 =====
+    xmin = x.min() - grid_size
+    xmax = x.max() + grid_size
+    ymin = y.min() - grid_size
+    ymax = y.max() + grid_size
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
     ax.set_title("Predicted towing count heatmap (pred_12)")
     ax.set_xlabel("X (meters)")
     ax.set_ylabel("Y (meters)")
