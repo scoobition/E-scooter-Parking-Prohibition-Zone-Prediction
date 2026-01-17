@@ -93,10 +93,80 @@ Random Forest was selected due to its robustness to non-linear relationships, sp
 
 ## Project Structure
 
-
+```text
+E-scooter-Parking-Prohibition-Zone-Prediction/
+├─ src/
+│  ├─ __pycache__/
+│  ├─ google_geocode.py
+│  ├─ grid.py
+│  ├─ io_loader.py
+│  ├─ make_features.py
+│  ├─ pipeline_geo.py
+│  ├─ predict_rf.py
+│  ├─ preprocess.py
+│  ├─ result.py
+│  ├─ reverse_geocode_top10.py
+│  ├─ train_rf.py
+│  ├─ visualize_pred.py
+│  └─ viz_grid_map.py
+│
+├─ data/
+│  ├─ 12_result_grid_meta.csv
+│  ├─ 12_result_predata.csv
+│  ├─ 12_result.csv
+│  ├─ after.csv
+│  ├─ features.csv
+│  ├─ geocode_cache_result.csv
+│  ├─ geocode_cache.csv
+│  ├─ grid_meta.csv
+│  ├─ pred_12.csv
+│  ├─ predata_12.csv
+│  ├─ predata.csv
+│  └─ top10_with_address.csv
+│
+├─ document/
+│  └─ documents
+│
+├─ map/
+│  └─ ( heatmap / pred / real HTML reault file by month)
+│
+├─ original_data/
+│  ├─ 1.csv
+│  ├─ 2.csv
+│  ├─ 3.csv
+│  ├─ 4.csv
+│  ├─ 5.csv
+│  ├─ 6.csv
+│  ├─ 7.csv
+│  ├─ 8.csv
+│  ├─ 9.csv
+│  ├─ 10.csv
+│  ├─ 11.csv
+│  └─ 12.csv
+│
+├─ demo_gui.py
+├─ main.py
+├─ model_rf.pkl
+├─ procedure.txt
+└─ README.md
+```
 ---
 
 ## How to Run
+1. Create a `.env` file in the same directory as `main.py` and add your API keys: 
+- ```
+  GOOGLE_MAPS_API_KEY=your_google_api_key
+  JUSO_CONFM_KEY=your_juso_api_key
+  ```
+2. Run the project:
+- Run in the terminal:
+  ```
+  python main.py
+  ```
+- Run with the GUI:
+  ```
+  python demo_gui.py
+  ```
 
 
 ---
