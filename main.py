@@ -149,7 +149,8 @@ if __name__ == "__main__":
     command = printing()
     while(command != "8"):
         if command == "1":
-            geo_pipeline()
+            # geo_pipeline()
+            print("api가 없어 잠시 비활성화 되어있습니다. 기능을 사용하고 싶으시다면 readme에 있는 실행방법을 확인 후 주석을 제거하고 실행해주세요.")
             command = printing()
         elif command == "2":
             grid_pipeline()
@@ -158,7 +159,8 @@ if __name__ == "__main__":
             ml_pipeline()
             command = printing()
         elif command == "4":
-            analysis_pipeline()
+            # analysis_pipeline()
+            print("api가 없어 잠시 비활성화 되어있습니다. 기능을 사용하고 싶으시다면 readme에 있는 실행방법을 확인 후 주석을 제거하고 실행해주세요.")
             command = printing()
         elif command == "5":
             map_pipeline()
