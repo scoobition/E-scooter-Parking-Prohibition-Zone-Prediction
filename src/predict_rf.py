@@ -14,7 +14,8 @@ def predict_rf(
 ) -> Path:
     """학습된 모델로 특정 월(pred_month)을 입력으로 다음 달(out_col) 예측 결과 저장."""
     df = pd.read_csv(data_path)
-    model = joblib.load(model_path)
+    bundle = joblib.load(model_path)
+    model = bundle["model"] if isinstance(bundle, dict) else bundle  # ✅ 핵심 수정
 
     pred_df = df[df["month"] == pred_month].copy()
     if pred_df.empty:

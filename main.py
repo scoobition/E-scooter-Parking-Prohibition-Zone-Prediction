@@ -170,7 +170,7 @@ if __name__ == "__main__":
     command = printing()
     while(command != "8"):
         if command == "1":
-            geo_pipeline()
+            # geo_pipeline()
             command = printing()
         elif command == "2":
             grid_pipeline()

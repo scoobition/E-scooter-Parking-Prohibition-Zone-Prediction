@@ -13,11 +13,10 @@ def train_rf(
     n_estimators: int = 1000,
     max_depth: int = 6,
     random_state: int = 42,
+    max_features: int = 2
 ) -> Path:
     """RandomForestRegressor 학습 후 모델 저장.
-
-    - 학습 데이터: month in train_months
-    - 타깃 y: 같은 grid_id에서 '다음 달' count_t (shift(-1))
+    + OOB 기반 내부 성능 평가 포함
     """
     df = pd.read_csv(data_path)
 
@@ -36,24 +35,42 @@ def train_rf(
     X = train[list(feature_cols)]
     y = train["y"].astype(float)
 
+    # =========================
+    # RandomForest + OOB
+    # =========================
     model = RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=max_depth,
         random_state=random_state,
+        max_features=max_features,
         n_jobs=-1,
-        bootstrap=True,     # ✅ OOB 필수
-        oob_score=True,     # ✅ OOB 활성화
+        min_samples_leaf=2,
+        oob_score=True,     # ⭐ 추가
+        bootstrap=True,     # ⭐ 반드시 필요
     )
 
     model.fit(X, y)
 
-    # ✅ OOB score 출력 (R²)
-    if hasattr(model, "oob_score_"):
-        print(f"[OOB] R^2 score: {model.oob_score_:.4f}")
+    # =========================
+    # OOB 성능 (R²)
+    # =========================
+    oob_r2 = float(model.oob_score_)
 
+    # =========================
+    # 모델 + OOB 점수 저장
+    # =========================
     out_p = Path(model_path)
-    joblib.dump(model, out_p)
+    joblib.dump(
+        {
+            "model": model,
+            "oob_r2": oob_r2,
+        },
+        out_p,
+    )
+
     print(f"[DONE] 모델 저장: {out_p}")
+    print(f"[INFO] OOB R2 score: {oob_r2:.4f}")
+
     return out_p
 
 
