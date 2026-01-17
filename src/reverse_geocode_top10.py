@@ -25,7 +25,7 @@ def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd
     pred = pd.read_csv(pred_path)
     meta = pd.read_csv(meta_path)
     df = pred.merge(meta, on="grid_id", how="left")
-    df = df.dropna(subset=["center_x_m", "center_y_m", "pred_12"]).copy()
+    df = df.dropna(subset=["center_x_m", "center_y_m", "count"]).copy()
     return df
 
 
@@ -59,7 +59,7 @@ def reverse_geocode_top10(
 ) -> Path:
     df = load_and_merge(pred_path, meta_path)
 
-    top = df.sort_values("pred_12", ascending=False).head(topn).copy()
+    top = df.sort_values("count", ascending=False).head(topn).copy()
     top = top.reset_index(drop=True)
 
     if not GOOGLE_API_KEY:
@@ -83,10 +83,10 @@ def reverse_geocode_top10(
 
     out_p = Path(out_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
-    top[["grid_id", "pred_12", "lat", "lon", "address"]].to_csv(out_p, index=False)
+    top[["grid_id", "count", "lat", "lon", "address"]].to_csv(out_p, index=False)
 
     print("\n[TOP GRID ADDRESS SAVED]")
-    print(top[["grid_id", "pred_12", "address"]])
+    print(top[["grid_id", "count", "address"]])
 
     print(f"[DONE] top{topn} 주소 결과 저장: {out_p}")
     return out_p

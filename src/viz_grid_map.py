@@ -1,201 +1,134 @@
 # src/viz_grid_map.py
 import os
-import numpy as np
+import math
 import pandas as pd
 import folium
 from typing import Optional
 from pyproj import Transformer
 
-
 CELL_SIZE_M = 200
-SRC_CRS = "EPSG:4326"   # lat/lon
-DST_CRS = "EPSG:5179"   # meter
+SRC_CRS = "EPSG:4326"
+DST_CRS = "EPSG:5179"
 
-def _red_color_from_count(count: float, vmin: float, vmax: float) -> str:
-    import math
 
+def _red_color_from_value(value: float, vmin: float, vmax: float) -> str:
     if vmax <= vmin:
         t = 1.0
     else:
-        t = (math.log(count + 1) - math.log(vmin + 1)) / (
+        t = (math.log(value + 1) - math.log(vmin + 1)) / (
             math.log(vmax + 1) - math.log(vmin + 1)
         )
         t = max(0.0, min(1.0, t))
-
-    gb = int(200 - t * 200)   # 진한 빨강
+    gb = int(220 - 200 * t)
     return f"#{255:02x}{gb:02x}{gb:02x}"
 
 
 def make_grid_heatmap_html(
-    month: int,
+    *,
+    month: Optional[int] = None,
     predata_csv: str = "data/predata.csv",
+    value_csv: Optional[str] = None,
+    value_col: str = "count",
     meta_csv: str = "data/grid_meta.csv",
     out_html: Optional[str] = None,
-    opacity: float = 0.35,
+    title: Optional[str] = None,
+    opacity: float = 0.4,
     max_cells: Optional[int] = 20000,
+    show_top10: bool = True,
 ):
-    """
-    month에 해당하는 격자들을 지도에 사각형(200m x 200m)으로 표시하고,
-    count가 많을수록 더 진한 빨강으로 채움(반투명).
-    결과는 html로 저장.
-    """
+    if value_csv is None and month is None:
+        raise ValueError("month 또는 value_csv 중 하나는 반드시 필요합니다.")
 
-    if out_html is None:
-        out_html = f"data/grid_heatmap_200m_{month}.html"
-
-    if not os.path.exists(predata_csv):
-        raise FileNotFoundError(f"{predata_csv} 없음")
-    if not os.path.exists(meta_csv):
-        raise FileNotFoundError(f"{meta_csv} 없음")
-
-    pre = pd.read_csv(predata_csv)
     meta = pd.read_csv(meta_csv)
 
-    # month 필터
-    pre_m = pre[pre["month"] == month].copy()
-    if pre_m.empty:
-        raise ValueError(f"predata에 month={month} 데이터가 없습니다.")
+    # =========================
+    # 데이터 로드
+    # =========================
+    if value_csv:
+        df_val = pd.read_csv(value_csv)
+        df = df_val[["grid_id", value_col]].copy()
+        df.rename(columns={value_col: "value"}, inplace=True)
+        map_title = title or f"{value_col} 기반 시각화"
+    else:
+        pre = pd.read_csv(predata_csv)
+        df_m = pre[pre["month"] == month]
+        df = df_m[["grid_id", "count"]].copy()
+        df.rename(columns={"count": "value"}, inplace=True)
+        map_title = title or f"{month}월 실제 견인 발생"
 
-    # merge: month,grid_id,count + (grid_x,grid_y 등)
-    df = pre_m.merge(meta, on="grid_id", how="left")
-    if df["grid_x"].isna().any():
-        missing = df[df["grid_x"].isna()]["grid_id"].head(5).tolist()
-        raise ValueError(f"grid_meta에 없는 grid_id가 있습니다. 예: {missing}")
+    df = df.merge(meta, on="grid_id", how="left")
+    df = df.dropna(subset=["center_x_m", "center_y_m", "value"])
 
-    # 너무 많은 격자는 folium 렌더링이 느릴 수 있음
-    if max_cells is not None and len(df) > max_cells:
-        df = df.sort_values("count", ascending=False).head(max_cells).copy()
+    if max_cells and len(df) > max_cells:
+        df = df.sort_values("value", ascending=False).head(max_cells)
 
-    # 색 범위
-    vmin = float(df["count"].min())
-    vmax = float(df["count"].max())
+    vmin, vmax = df["value"].min(), df["value"].max()
 
-    # EPSG:5179(m) -> EPSG:4326(latlon) 변환기
+    # =========================
+    # 지도 생성
+    # =========================
     to_latlon = Transformer.from_crs(DST_CRS, SRC_CRS, always_xy=True)
-
-    # 지도 중심(데이터 평균 중심점)
-    center_lon, center_lat = to_latlon.transform(
-        df["center_x_m"].to_numpy(dtype=float).mean(),
-        df["center_y_m"].to_numpy(dtype=float).mean()
-    )
+    lon, lat = to_latlon.transform(df["center_x_m"].mean(), df["center_y_m"].mean())
 
     m = folium.Map(
-        location=[center_lat, center_lon],
+        location=[lat, lon],
         zoom_start=12,
         tiles="cartodbpositron",
     )
 
+    # =========================
+    # 범례
+    # =========================
     legend_html = f"""
-    <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
-        background: rgba(255, 255, 255, 0.92);
-        padding: 12px 14px;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        font-size: 13px;
-        line-height: 1.4;
-    ">
-        <div style="font-weight: 700; margin-bottom: 6px;">
-            {month}월 · 200m 격자 히트맵
-        </div>
-        <div style="font-size: 12px; color: #444;">
-            <div>색상: <b>진할수록 많음</b></div>
-            <div>건수 범위: {int(vmin)} ~ {int(vmax)}</div>
-        </div>
+    <div style="position:fixed; top:20px; right:20px; z-index:9999;
+                background:rgba(255,255,255,0.92); padding:12px;
+                border-radius:10px; font-size:13px;">
+      <b>{map_title}</b><br>
+      진할수록 많음<br>
+      범위: {vmin:.2f} ~ {vmax:.2f}
     </div>
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
+    # =========================
+    # Top10 박스
+    # =========================
+    if show_top10:
+        top10 = df.sort_values("value", ascending=False).head(10)
+        rows = ""
+        for i, r in enumerate(top10.itertuples(), 1):
+            rows += f"{i}. {r.grid_id} ({r.value:.2f})<br>"
 
-    # 각 격자 사각형 그리기
-    half = CELL_SIZE_M / 2.0
+        top10_html = f"""
+        <div style="position:fixed; top:150px; right:20px; z-index:9999;
+                    background:rgba(255,255,255,0.92); padding:12px;
+                    border-radius:10px; font-size:12px; max-width:260px;">
+          <b>Top-10 격자</b><br>
+          {rows}
+        </div>
+        """
+        m.get_root().html.add_child(folium.Element(top10_html))
 
-    for _, r in df.iterrows():
-        cx = float(r["center_x_m"])
-        cy = float(r["center_y_m"])
-
-        # 200m 격자 사각형의 4개 코너(미터)
-        minx, maxx = cx - half, cx + half
-        miny, maxy = cy - half, cy + half
-
-        # folium Rectangle은 lat/lon bounds 필요:
-        # SW(minx,miny) / NE(maxx,maxy)
+    # =========================
+    # 격자 렌더링
+    # =========================
+    half = CELL_SIZE_M / 2
+    for r in df.itertuples():
+        color = _red_color_from_value(r.value, vmin, vmax)
+        minx, maxx = r.center_x_m - half, r.center_x_m + half
+        miny, maxy = r.center_y_m - half, r.center_y_m + half
         sw_lon, sw_lat = to_latlon.transform(minx, miny)
         ne_lon, ne_lat = to_latlon.transform(maxx, maxy)
 
-        color = _red_color_from_count(float(r["count"]), vmin, vmax)
-
         folium.Rectangle(
             bounds=[[sw_lat, sw_lon], [ne_lat, ne_lon]],
-            color=None,             # 테두리 없애기
-            weight=0,
             fill=True,
             fill_color=color,
             fill_opacity=opacity,
-            tooltip=f'grid_id={r["grid_id"]} | count={int(r["count"])}',
+            weight=0,
+            tooltip=f"{r.grid_id}: {r.value:.2f}",
         ).add_to(m)
 
     os.makedirs(os.path.dirname(out_html), exist_ok=True)
     m.save(out_html)
-    print(f"[INFO] saved: {out_html}")
-
-
-def run_grid_heatmap(
-    month: int,
-    predata_csv: str = "data/predata.csv",
-    meta_csv: str = "data/grid_meta.csv",
-    out_html: Optional[str] = None,
-    opacity: float = 0.35,
-    max_cells: Optional[int] = 20000,
-):
-    """
-    메인에서 한 줄로 호출하려고 만든 래퍼 함수.
-    내부적으로 make_grid_heatmap_html() 호출.
-    """
-    make_grid_heatmap_html(
-        month=month,
-        predata_csv=predata_csv,
-        meta_csv=meta_csv,
-        out_html=out_html,
-        opacity=opacity,
-        max_cells=max_cells,
-    )
-
-def make_monthly_heatmaps(
-    months=None,  # None이면 predata에 있는 month 전부 자동
-    predata_csv: str = "data/predata.csv",
-    meta_csv: str = "data/grid_meta.csv",
-    out_dir: str = "map",
-    opacity: float = 0.5,
-    max_cells: Optional[int] = 20000,
-):
-    """
-    여러 월에 대해 격자 히트맵 HTML을 일괄 생성해서 out_dir에 저장.
-    out_dir 예: "map"  -> map/grid_heatmap_200m_7.html 이런 식으로 생성됨
-    """
-    if not os.path.exists(predata_csv):
-        raise FileNotFoundError(f"{predata_csv} 없음")
-    if not os.path.exists(meta_csv):
-        raise FileNotFoundError(f"{meta_csv} 없음")
-
-    os.makedirs(out_dir, exist_ok=True)
-
-    pre = pd.read_csv(predata_csv)
-
-    # months를 지정 안 하면, predata에 있는 month 전부 사용
-    if months is None:
-        months = sorted(pre["month"].dropna().unique().tolist())
-
-    for m in months:
-        out_html = os.path.join(out_dir, f"grid_heatmap_200m_{int(m)}.html")
-        make_grid_heatmap_html(
-            month=int(m),
-            predata_csv=predata_csv,
-            meta_csv=meta_csv,
-            out_html=out_html,
-            opacity=opacity,
-            max_cells=max_cells,
-        )
+    print(f"[DONE] saved: {out_html}")
