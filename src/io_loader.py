@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 
-def load_months(input_dir="original_data", months=(7,8,9,10,11)) -> pd.DataFrame:
+def load_months(input_dir="original_data", months=(1,2,3,4,5,6,7,8,9,10,11)) -> pd.DataFrame:
     dfs = []
     for m in months:
         path = os.path.join(input_dir, f"{m}.csv")

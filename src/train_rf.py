@@ -8,7 +8,7 @@ from typing import Sequence, List
 def train_rf(
     data_path: str = "data/features.csv",
     model_path: str = "model_rf.pkl",
-    train_months: Sequence[int] = (9, 10),
+    train_months: Sequence[int] = (3,4,5,6,7,8,9,10),
     feature_cols: Sequence[str] = ("count_t", "count_t-1", "count_t-2"),
     n_estimators: int = 300,
     max_depth: int = 8,

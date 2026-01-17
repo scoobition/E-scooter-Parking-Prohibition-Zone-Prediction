@@ -5,7 +5,7 @@ from src.google_geocode import fill_cache_for_addresses
 
 def geo(
     input_dir="original_data",
-    months=(7,8,9,10,11),
+    months=(1,2,3,4,5,6,7,8,9,10,11),
     out_path="data/after.csv",
     cache_path="data/geocode_cache.csv",
     sleep_sec=0.05,
