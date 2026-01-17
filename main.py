@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 import pandas as pd
 import numpy as np
+import joblib
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -182,7 +183,7 @@ if __name__ == "__main__":
     command = printing()
     while(command != "7"):
         if command == "1":
-            geo_pipeline()
+            # geo_pipeline()
             command = printing()
         elif command == "2":
             grid_pipeline()
@@ -197,7 +198,7 @@ if __name__ == "__main__":
             map_pipeline()
             command = printing()
         elif command == "6":
-            geo_pipeline()
+            # geo_pipeline()
             grid_pipeline()
             ml_pipeline()
             analysis_pipeline()

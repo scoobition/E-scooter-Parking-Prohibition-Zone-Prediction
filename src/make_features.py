@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Iterable, List, Sequence
 
 
-def make_lag_features(df: pd.DataFrame, lags: Sequence[int] = (1, 2)) -> pd.DataFrame:
+def make_lag_features(df: pd.DataFrame, lags: Sequence[int] = (1, 2, 3)) -> pd.DataFrame:
     """grid_id별 월별 count로 lag feature 생성.
 
     입력 df는 최소 컬럼: [month, grid_id, count]
@@ -29,7 +29,7 @@ def make_lag_features(df: pd.DataFrame, lags: Sequence[int] = (1, 2)) -> pd.Data
 def make_features(
     in_path: str = "data/predata.csv",
     out_path: str = "data/features.csv",
-    lags: Sequence[int] = (1, 2),
+    lags: Sequence[int] = (1, 2 ,3),
 ) -> Path:
     """predata.csv -> features.csv 생성 (lag feature 추가)."""
     in_p = Path(in_path)
