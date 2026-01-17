@@ -18,8 +18,6 @@ from src.predict_rf import predict_rf
 from src.reverse_geocode_top10 import reverse_geocode_top10
 from src.viz_grid_map import make_grid_heatmap_html, make_grid_error_heatmap_html
 
-
-
 # =========================
 # PIPELINES
 # =========================
@@ -95,7 +93,7 @@ def map_pipeline():
     print("\n=== MAP PIPELINE ===")
 
     # 1️⃣ 7~11월 실제
-    for m in [7, 8, 9, 10, 11]:
+    for m in [1,2,3,4,5,6,7, 8, 9, 10, 11]:
         make_grid_heatmap_html(
             month=m,
             out_html=f"map/grid_heatmap_200m_{m}.html",
