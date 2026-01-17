@@ -9,9 +9,11 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import tkinter as tk
+import webbrowser
+from pathlib import Path
 
 # =========================
-# main.py 파이프라인 import
+# main.py 함수 import
 # =========================
 from main import (
     geo_pipeline,
@@ -19,7 +21,10 @@ from main import (
     ml_pipeline,
     analysis_pipeline,
     map_pipeline,
+    error_check,
 )
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class DemoApp:
@@ -49,15 +54,16 @@ class DemoApp:
         self.footer.pack(side="bottom", pady=(20, 0))
 
         # -----------------
-        # Buttons (main.py 메뉴 그대로)
+        # Buttons (main.py 메뉴 1~7 대응)
         # -----------------
         self._make_button("1. Geocoding Pipeline", geo_pipeline)
         self._make_button("2. Grid Pipeline", grid_pipeline)
         self._make_button("3. Model Testing (Train + Predict)", ml_pipeline)
         self._make_button("4. Result Analysis (Top-10)", analysis_pipeline)
-        self._make_button("5. Visualization (Maps)", map_pipeline)
+        self._make_button("5. Visualization (Maps)", self.open_maps)
+        self._make_button("6. Error Check (MAE / RMSE)", error_check)
         self._make_button(
-            "6. All Pipelines",
+            "7. All Pipelines",
             self.run_all_pipelines,
             pady=18,
         )
@@ -77,19 +83,31 @@ class DemoApp:
         tk.Button(
             self.body,
             text=text,
-            width=36,
+            width=42,
             font=("Apple SD Gothic Neo", 14),
             command=lambda: self.run(command),
         ).pack(pady=pady)
 
     def run(self, fn):
-        """
-        버튼 클릭 → 기존 main.py 함수 실행
-        """
         self.root.after(100, fn)
 
     # =========================
-    # main.py 메뉴 6번과 동일
+    # Visualization 전용
+    # =========================
+    def open_maps(self):
+        real_map = BASE_DIR / "map" / "real_12.html"
+        pred_map = BASE_DIR / "map" / "pred_12.html"
+        error_map = BASE_DIR / "map" / "error_12.html"
+
+        if real_map.exists():
+            webbrowser.open(real_map.as_uri())
+        if pred_map.exists():
+            webbrowser.open(pred_map.as_uri())
+        if error_map.exists():
+            webbrowser.open(error_map.as_uri())
+
+    # =========================
+    # main.py 메뉴 7번과 동일
     # =========================
     def run_all_pipelines(self):
         self.root.after(100, geo_pipeline)
@@ -97,6 +115,7 @@ class DemoApp:
         self.root.after(300, ml_pipeline)
         self.root.after(400, analysis_pipeline)
         self.root.after(500, map_pipeline)
+        self.root.after(600, error_check)
 
 
 # ============================
