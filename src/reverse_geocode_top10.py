@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, Tuple, List
 
-# 프로젝트 루트(.env) 로드: (현재 파일이 src/ 아래에 있다는 가정)
+
+# Load .env from project root
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_PATH = BASE_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
@@ -17,10 +18,12 @@ PRED_PATH = "data/pred_12.csv"
 META_PATH = "data/grid_meta.csv"
 OUT_PATH = "data/top10_with_address.csv"
 
-# grid_meta.csv가 EPSG:5179(한국 TM) 계열의 meter 좌표를 갖고 있다고 가정
+
+# Transform from meter-based CRS to lat/lon
 transformer = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
 
 
+# Load prediction and grid metadata
 def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd.DataFrame:
     pred = pd.read_csv(pred_path)
     meta = pd.read_csv(meta_path)
@@ -29,11 +32,13 @@ def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd
     return df
 
 
+# Convert grid center to lat/lon
 def to_latlon(x_m: float, y_m: float) -> Tuple[float, float]:
     lon, lat = transformer.transform(x_m, y_m)
     return float(lat), float(lon)
 
 
+# Reverse geocode coordinates to address
 def reverse_geocode(lat: float, lon: float, api_key: str, timeout: float = 8.0) -> Optional[str]:
     url = "https://maps.googleapis.com/maps/api/geocode/json"
     params = {"latlng": f"{lat},{lon}", "key": api_key, "language": "ko"}
@@ -51,6 +56,7 @@ def reverse_geocode(lat: float, lon: float, api_key: str, timeout: float = 8.0) 
         return None
 
 
+# Reverse geocode top-N predicted grids
 def reverse_geocode_top10(
     pred_path: str = PRED_PATH,
     meta_path: str = META_PATH,

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Sequence
 
 
+# Predict next month counts using trained RF model
 def predict_rf(
     data_path: str = "data/features.csv",
     model_path: str = "model_rf.pkl",
@@ -12,10 +13,9 @@ def predict_rf(
     feature_cols: Sequence[str] = ("count_t", "count_t-1", "count_t-2"),
     out_col: str = "count",
 ) -> Path:
-    """학습된 모델로 특정 월(pred_month)을 입력으로 다음 달(out_col) 예측 결과 저장."""
     df = pd.read_csv(data_path)
     bundle = joblib.load(model_path)
-    model = bundle["model"] if isinstance(bundle, dict) else bundle  # ✅ 핵심 수정
+    model = bundle["model"] if isinstance(bundle, dict) else bundle  # Handle wrapped model
 
     pred_df = df[df["month"] == pred_month].copy()
     if pred_df.empty:

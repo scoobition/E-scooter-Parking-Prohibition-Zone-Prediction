@@ -11,6 +11,7 @@ SRC_CRS = "EPSG:4326"
 DST_CRS = "EPSG:5179"
 
 
+# Map value to red intensity (log-scaled)
 def _red_color_from_value(value: float, vmin: float, vmax: float) -> str:
     if vmax <= vmin:
         t = 1.0
@@ -22,30 +23,24 @@ def _red_color_from_value(value: float, vmin: float, vmax: float) -> str:
     gb = int(220 - 200 * t)
     return f"#{255:02x}{gb:02x}{gb:02x}"
 
+
+# Map residual to diverging color (red/blue)
 def _diverging_color_from_residual(residual: float, vabsmax: float) -> str:
-    """
-    residual = pred - real
-    - residual > 0 : 과대예측 (빨강)
-    - residual < 0 : 과소예측 (파랑)
-    - 0 근처 : 흰색
-    """
     if vabsmax <= 0:
         t = 0.0
     else:
         t = abs(residual) / vabsmax
         t = max(0.0, min(1.0, t))
 
-    # t=0 -> 흰색(255), t=1 -> 진한 색(55 정도)
-    fade = int(255 - 200 * t)  # 255 -> 55
+    fade = int(255 - 200 * t)
 
     if residual >= 0:
-        # 빨강 계열: (255, fade, fade)
         return f"#{255:02x}{fade:02x}{fade:02x}"
     else:
-        # 파랑 계열: (fade, fade, 255)
         return f"#{fade:02x}{fade:02x}{255:02x}"
 
 
+# Render grid heatmap HTML
 def make_grid_heatmap_html(
     *,
     month: Optional[int] = None,
@@ -58,7 +53,6 @@ def make_grid_heatmap_html(
     opacity: float = 0.4,
     max_cells: Optional[int] = 20000,
     show_top10: bool = True,
-    # ✅ 추가: 색 스케일 고정(실제/예측 지도 동일 진하기)
     scale_vmin: Optional[float] = None,
     scale_vmax: Optional[float] = None,
 ):
@@ -69,9 +63,7 @@ def make_grid_heatmap_html(
 
     meta = pd.read_csv(meta_csv)
 
-    # =========================
-    # 데이터 로드
-    # =========================
+    # Load value data
     if value_csv:
         df_val = pd.read_csv(value_csv)
         df = df_val[["grid_id", value_col]].copy()
@@ -90,21 +82,15 @@ def make_grid_heatmap_html(
     if max_cells and len(df) > max_cells:
         df = df.sort_values("value", ascending=False).head(max_cells)
 
-    # ✅ 데이터 자체 범위(참고용)
     vmin_data = float(df["value"].min())
     vmax_data = float(df["value"].max())
 
-    # ✅ 실제/예측 스케일 통일용 범위
     vmin = float(scale_vmin) if scale_vmin is not None else vmin_data
     vmax = float(scale_vmax) if scale_vmax is not None else vmax_data
-
-    # 안전장치
     if vmax <= vmin:
         vmax = vmin + 1e-9
 
-    # =========================
-    # 지도 생성
-    # =========================
+    # Initialize map
     to_latlon = Transformer.from_crs(DST_CRS, SRC_CRS, always_xy=True)
     lon, lat = to_latlon.transform(df["center_x_m"].mean(), df["center_y_m"].mean())
 
@@ -114,26 +100,22 @@ def make_grid_heatmap_html(
         tiles="cartodbpositron",
     )
 
-    # =========================
-    # 범례
-    # =========================
+    # Legend box
     legend_html = f"""
     <div style="position:fixed; top:20px; right:20px; z-index:9999;
                 background:rgba(255,255,255,0.92); padding:12px;
                 border-radius:10px; font-size:13px; line-height:1.35;">
       <b>{map_title}</b><br>
-      진할수록 많음<br>
+      Darker means higher<br>
       <span style="font-size:12px;">
-        색 스케일: {vmin:.2f} ~ {vmax:.2f}<br>
-        데이터 범위: {vmin_data:.2f} ~ {vmax_data:.2f}
+        Color scale: {vmin:.2f} ~ {vmax:.2f}<br>
+        Data range: {vmin_data:.2f} ~ {vmax_data:.2f}
       </span>
     </div>
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    # =========================
-    # Top10 박스
-    # =========================
+    # Top-10 grids
     if show_top10:
         top10 = df.sort_values("value", ascending=False).head(10)
         rows = ""
@@ -144,18 +126,15 @@ def make_grid_heatmap_html(
         <div style="position:fixed; top:150px; right:20px; z-index:9999;
                     background:rgba(255,255,255,0.92); padding:12px;
                     border-radius:10px; font-size:12px; max-width:260px; line-height:1.35;">
-          <b>Top-10 격자</b><br>
+          <b>Top-10 grids</b><br>
           {rows}
         </div>
         """
         m.get_root().html.add_child(folium.Element(top10_html))
 
-    # =========================
-    # 격자 렌더링
-    # =========================
+    # Draw grid cells
     half = CELL_SIZE_M / 2
     for r in df.itertuples():
-        # ✅ vmin/vmax를 스케일로 사용
         color = _red_color_from_value(r.value, vmin, vmax)
 
         minx, maxx = r.center_x_m - half, r.center_x_m + half
@@ -172,7 +151,6 @@ def make_grid_heatmap_html(
             tooltip=f"{r.grid_id}: {r.value:.2f}",
         ).add_to(m)
 
-    # out_html 경로 생성
     out_dir = os.path.dirname(out_html)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
@@ -180,6 +158,8 @@ def make_grid_heatmap_html(
     m.save(out_html)
     print(f"[DONE] saved: {out_html}")
 
+
+# Render residual heatmap HTML
 def make_grid_error_heatmap_html(
     *,
     real_csv: str,
@@ -190,16 +170,9 @@ def make_grid_error_heatmap_html(
     title: str = "오차지도 (예측 - 실제)",
     opacity: float = 0.45,
     max_cells: Optional[int] = 20000,
-    # ✅ 오차 스케일(색 진하기) 고정하고 싶으면 사용
     scale_absmax: Optional[float] = None,
     show_top10: bool = True,
 ):
-    """
-    오차지도: residual = pred - real
-    - 빨강: 과대예측(예측이 더 큼)
-    - 파랑: 과소예측(예측이 더 작음)
-    """
-
     meta = pd.read_csv(meta_csv)
 
     df_real = pd.read_csv(real_csv)[["grid_id", value_col]].rename(columns={value_col: "real"})
@@ -211,7 +184,6 @@ def make_grid_error_heatmap_html(
     df = df.merge(meta, on="grid_id", how="left")
     df = df.dropna(subset=["center_x_m", "center_y_m", "residual"])
 
-    # 너무 많으면 |오차| 큰 것 위주로 제한(오차지도 목적에 맞음)
     if max_cells and len(df) > max_cells:
         df = df.reindex(df["residual"].abs().sort_values(ascending=False).head(max_cells).index)
 
@@ -220,7 +192,7 @@ def make_grid_error_heatmap_html(
     if absmax <= 0:
         absmax = 1e-9
 
-    # 지도 중심
+    # Initialize map
     to_latlon = Transformer.from_crs(DST_CRS, SRC_CRS, always_xy=True)
     lon, lat = to_latlon.transform(df["center_x_m"].mean(), df["center_y_m"].mean())
 
@@ -230,22 +202,22 @@ def make_grid_error_heatmap_html(
         tiles="cartodbpositron",
     )
 
-    # 범례
+    # Legend box
     legend_html = f"""
     <div style="position:fixed; top:20px; right:20px; z-index:9999;
                 background:rgba(255,255,255,0.92); padding:12px;
                 border-radius:10px; font-size:13px; line-height:1.35;">
       <b>{title}</b><br>
-      빨강: 과대예측 / 파랑: 과소예측<br>
+      Red: over-prediction / Blue: under-prediction<br>
       <span style="font-size:12px;">
-        색 스케일(|오차|): 0 ~ {absmax:.2f}<br>
-        데이터 최대 |오차|: {absmax_data:.2f}
+        Color scale (|diff|): 0 ~ {absmax:.2f}<br>
+        Max |diff|: {absmax_data:.2f}
       </span>
     </div>
     """
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    # Top-10 (|오차| 큰 격자)
+    # Top-10 residual grids
     if show_top10 and len(df):
         top10 = df.reindex(df["residual"].abs().sort_values(ascending=False).head(10).index)
         rows = ""
@@ -256,13 +228,13 @@ def make_grid_error_heatmap_html(
         <div style="position:fixed; top:170px; right:20px; z-index:9999;
                     background:rgba(255,255,255,0.92); padding:12px;
                     border-radius:10px; font-size:12px; max-width:320px; line-height:1.35;">
-          <b>|오차| Top-10 격자</b><br>
+          <b>|diff| Top-10 grids</b><br>
           {rows}
         </div>
         """
         m.get_root().html.add_child(folium.Element(top10_html))
 
-    # 격자 렌더
+    # Draw grid cells
     half = CELL_SIZE_M / 2
     for r in df.itertuples():
         color = _diverging_color_from_residual(r.residual, absmax)

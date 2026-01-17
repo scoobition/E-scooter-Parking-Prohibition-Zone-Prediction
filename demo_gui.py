@@ -1,7 +1,6 @@
 # demo_gui.py
-# ======================================
-# macOS Tk 경고 억제 (Tk import 이전)
-# ======================================
+
+# Suppress Tk deprecation warning on macOS
 import os
 os.environ["TK_SILENCE_DEPRECATION"] = "1"
 
@@ -12,9 +11,8 @@ import tkinter as tk
 import webbrowser
 from pathlib import Path
 
-# =========================
-# main.py 함수 import
-# =========================
+
+# Import pipelines from main
 from main import (
     geo_pipeline,
     grid_pipeline,
@@ -34,9 +32,7 @@ class DemoApp:
         self.root.geometry("960x640")
         self.root.resizable(False, False)
 
-        # -----------------
-        # Layout
-        # -----------------
+        # Main layout
         self.main = tk.Frame(self.root, padx=40, pady=30)
         self.main.pack(fill="both", expand=True)
 
@@ -53,9 +49,7 @@ class DemoApp:
         self.footer = tk.Frame(self.main)
         self.footer.pack(side="bottom", pady=(20, 0))
 
-        # -----------------
-        # Buttons (main.py 메뉴 1~7 대응)
-        # -----------------
+        # Pipeline buttons
         self._make_button("1. Geocoding Pipeline", geo_pipeline)
         self._make_button("2. Grid Pipeline", grid_pipeline)
         self._make_button("3. Model Testing (Train + Predict)", ml_pipeline)
@@ -76,9 +70,7 @@ class DemoApp:
             command=self.root.destroy,
         ).pack()
 
-    # =========================
-    # UI Helper
-    # =========================
+    # UI helper
     def _make_button(self, text, command, pady=8):
         tk.Button(
             self.body,
@@ -91,9 +83,7 @@ class DemoApp:
     def run(self, fn):
         self.root.after(100, fn)
 
-    # =========================
-    # Visualization 전용
-    # =========================
+    # Open map HTML files
     def open_maps(self):
         real_map = BASE_DIR / "map" / "real_12.html"
         pred_map = BASE_DIR / "map" / "pred_12.html"
@@ -106,9 +96,7 @@ class DemoApp:
         if error_map.exists():
             webbrowser.open(error_map.as_uri())
 
-    # =========================
-    # main.py 메뉴 7번과 동일
-    # =========================
+    # Run all pipelines sequentially
     def run_all_pipelines(self):
         self.root.after(100, geo_pipeline)
         self.root.after(200, grid_pipeline)
@@ -118,9 +106,7 @@ class DemoApp:
         self.root.after(600, error_check)
 
 
-# ============================
-# mainloop (1회)
-# ============================
+# Start Tk main loop
 if __name__ == "__main__":
     root = tk.Tk()
     app = DemoApp(root)

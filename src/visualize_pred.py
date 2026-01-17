@@ -7,9 +7,10 @@ from typing import Optional
 
 PRED_PATH = "data/pred_12.csv"
 META_PATH = "data/grid_meta.csv"
-GRID_SIZE_M = 200  # grid.py에서 사용한 격자 한 변 길이(미터)
+GRID_SIZE_M = 200  # Grid size in meters
 
 
+# Load prediction and grid metadata
 def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd.DataFrame:
     pred = pd.read_csv(pred_path)
     meta = pd.read_csv(meta_path)
@@ -18,6 +19,7 @@ def load_and_merge(pred_path: str = PRED_PATH, meta_path: str = META_PATH) -> pd
     return df
 
 
+# Print top-N grids by predicted value
 def print_top10(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     top = df.sort_values("pred_12", ascending=False).head(n).copy()
     top = top.reset_index(drop=True)
@@ -27,6 +29,7 @@ def print_top10(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     return top
 
 
+# Plot grid-based heatmap from center coordinates
 def plot_grid_heatmap(
     df: pd.DataFrame,
     grid_size: int = GRID_SIZE_M,
@@ -34,7 +37,6 @@ def plot_grid_heatmap(
     save_path: Optional[str] = None,
     show: bool = True,
 ):
-    """center_x_m/center_y_m 기반으로 예측값 heatmap 스타일로 그리기."""
     x = df["center_x_m"].to_numpy()
     y = df["center_y_m"].to_numpy()
     v = df["pred_12"].to_numpy()
@@ -44,7 +46,7 @@ def plot_grid_heatmap(
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.set_aspect("equal", adjustable="box")
 
-    # 값이 큰 격자를 위에 그리도록 정렬
+    # Draw higher values on top
     order = np.argsort(v)
     for idx in order:
         xi, yi, vi = x[idx], y[idx], v[idx]
@@ -62,7 +64,7 @@ def plot_grid_heatmap(
         )
         ax.add_patch(rect)
 
-    # ===== [핵심 추가] 축 범위를 데이터 기준으로 설정 =====
+    # Set axis limits from data bounds
     xmin = x.min() - grid_size
     xmax = x.max() + grid_size
     ymin = y.min() - grid_size
@@ -92,6 +94,7 @@ def plot_grid_heatmap(
         plt.close(fig)
 
 
+# Run visualization pipeline
 def visualize_pred(
     pred_path: str = PRED_PATH,
     meta_path: str = META_PATH,

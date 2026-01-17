@@ -5,6 +5,7 @@ from sklearn.ensemble import RandomForestRegressor
 from typing import Sequence
 
 
+# Train RandomForest model with OOB evaluation
 def train_rf(
     data_path: str = "data/features.csv",
     model_path: str = "model_rf.pkl",
@@ -15,9 +16,6 @@ def train_rf(
     random_state: int = 42,
     max_features: int = 2
 ) -> Path:
-    """RandomForestRegressor 학습 후 모델 저장.
-    + OOB 기반 내부 성능 평가 포함
-    """
     df = pd.read_csv(data_path)
 
     missing = set(["month", "grid_id", "count_t", *feature_cols]) - set(df.columns)
@@ -28,16 +26,14 @@ def train_rf(
     if train.empty:
         raise ValueError(f"train_months={list(train_months)}에 해당하는 학습 데이터가 없습니다.")
 
-    # y = 다음 달 count_t
+    # Use next-month count as target
     train["y"] = train.groupby("grid_id")["count_t"].shift(-1)
     train = train.dropna(subset=["y", *feature_cols]).copy()
 
     X = train[list(feature_cols)]
     y = train["y"].astype(float)
 
-    # =========================
-    # RandomForest + OOB
-    # =========================
+    # Configure RandomForest with OOB
     model = RandomForestRegressor(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -45,20 +41,16 @@ def train_rf(
         max_features=max_features,
         n_jobs=-1,
         min_samples_leaf=2,
-        oob_score=True,     # ⭐ 추가
-        bootstrap=True,     # ⭐ 반드시 필요
+        oob_score=True,
+        bootstrap=True,
     )
 
     model.fit(X, y)
 
-    # =========================
-    # OOB 성능 (R²)
-    # =========================
+    # Extract OOB R2 score
     oob_r2 = float(model.oob_score_)
 
-    # =========================
-    # 모델 + OOB 점수 저장
-    # =========================
+    # Save model and OOB score
     out_p = Path(model_path)
     joblib.dump(
         {

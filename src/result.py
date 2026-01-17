@@ -11,6 +11,7 @@ from src.grid import make_predata_and_meta_csv
 from src.viz_grid_map import make_grid_heatmap_html
 
 
+# Run result pipeline for a single CSV
 def make_result(
     input_dir: str = "original_data",
     filename: str = "12.csv",
@@ -21,15 +22,6 @@ def make_result(
     opacity: float = 0.5,
     max_cells: int | None = 20000,
 ):
-    """
-    original_dataa/12.csv 1개 파일을 대상으로:
-    1) 지오코딩 (캐시 활용)
-    2) 200m 격자화(predata/meta)
-    3) 히트맵 HTML 생성
-    출력 파일명 규칙:
-      - 입력 파일 stem(예: 12) + "_result" 를 기본으로 사용
-    """
-
     in_path = Path(input_dir) / filename
     if not in_path.exists():
         raise FileNotFoundError(f"입력 파일이 없습니다: {in_path}")
@@ -37,12 +29,10 @@ def make_result(
     os.makedirs(out_data_dir, exist_ok=True)
     os.makedirs(out_map_dir, exist_ok=True)
 
-    stem = in_path.stem  # "12"
-    month = int(stem) if stem.isdigit() else 12  # 혹시 파일명이 숫자가 아니어도 최소 12로
+    stem = in_path.stem
+    month = int(stem) if stem.isdigit() else 12
 
-    # -------------------------
-    # 1) CSV 로드 + month 부여
-    # -------------------------
+    # Load CSV and assign month
     df = pd.read_csv(in_path)
     if "주소" not in df.columns:
         raise KeyError("입력 CSV에 '주소' 컬럼이 없습니다.")
@@ -54,9 +44,7 @@ def make_result(
     print(f"[INFO] input rows: {len(df)}")
     print(f"[INFO] unique addresses: {len(unique_addrs)}")
 
-    # -------------------------
-    # 2) 지오코딩(캐시)
-    # -------------------------
+    # Geocode with cache
     cache = fill_cache_for_addresses(
         unique_addrs,
         cache_path=cache_path,
@@ -73,9 +61,7 @@ def make_result(
     print(f"[DONE] geocoded saved: {geo_out_path}")
     print(f"[INFO] geocode fail: {fail}/{len(out_geo)} ({(fail/len(out_geo)*100 if len(out_geo) else 0):.2f}%)")
 
-    # -------------------------
-    # 3) 격자화(predata/meta)
-    # -------------------------
+    # Build grid predata and metadata
     predata_path = Path(out_data_dir) / f"{stem}_result_predata.csv"
     meta_path = Path(out_data_dir) / f"{stem}_result_grid_meta.csv"
 
@@ -85,9 +71,7 @@ def make_result(
         meta_csv=str(meta_path),
     )
 
-        # -------------------------
-    # 3-1) predata_12.csv 추가 저장
-    # -------------------------
+    # Save simplified predata
     simple_predata_path = Path(out_data_dir) / f"predata_{month}.csv"
 
     df_pre = pd.read_csv(predata_path)
@@ -97,9 +81,7 @@ def make_result(
 
     print(f"[DONE] simple predata saved: {simple_predata_path}")
 
-    # -------------------------
-    # 4) 히트맵(html)
-    # -------------------------
+    # Generate heatmap HTML
     html_out_path = Path(out_map_dir) / f"{stem}_result_grid_heatmap_200m_{month}.html"
     make_grid_heatmap_html(
         month=month,

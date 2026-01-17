@@ -3,12 +3,8 @@ from pathlib import Path
 from typing import Iterable, List, Sequence
 
 
+# Create lag features per grid and month
 def make_lag_features(df: pd.DataFrame, lags: Sequence[int] = (1, 2)) -> pd.DataFrame:
-    """grid_id별 월별 count로 lag feature 생성.
-
-    입력 df는 최소 컬럼: [month, grid_id, count]
-    출력 df는 count_t, count_t-1, count_t-2 ... 컬럼 포함.
-    """
     required = {"month", "grid_id", "count"}
     missing = required - set(df.columns)
     if missing:
@@ -20,18 +16,18 @@ def make_lag_features(df: pd.DataFrame, lags: Sequence[int] = (1, 2)) -> pd.Data
     for lag in lags:
         df[f"count_t-{lag}"] = df.groupby("grid_id")["count_t"].shift(lag)
 
-    # 과거 정보 없는 행 제거 (lags 전부 존재해야 학습/예측 입력으로 사용 가능)
+    # Drop rows without full lag history
     lag_cols = [f"count_t-{lag}" for lag in lags]
     df = df.dropna(subset=["count_t", *lag_cols]).copy()
     return df
 
 
+# Generate features CSV
 def make_features(
     in_path: str = "data/predata.csv",
     out_path: str = "data/features.csv",
     lags: Sequence[int] = (1, 2),
 ) -> Path:
-    """predata.csv -> features.csv 생성 (lag feature 추가)."""
     in_p = Path(in_path)
     if not in_p.exists():
         raise FileNotFoundError(f"입력 파일이 없습니다: {in_path}")
