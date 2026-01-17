@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import joblib
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -17,6 +19,37 @@ from src.train_rf import train_rf
 from src.predict_rf import predict_rf
 from src.reverse_geocode_top10 import reverse_geocode_top10
 from src.viz_grid_map import make_grid_heatmap_html, make_grid_error_heatmap_html
+
+def error_check(
+    real_csv="data/predata_12.csv",
+    pred_csv="data/pred_12.csv",
+):
+    """
+    12월 실제값 vs 예측값 오차 평가
+    - MAE
+    - RMSE
+    """
+    print("\n=== ERROR CHECK (MAE / RMSE) ===")
+
+    df_real = pd.read_csv(real_csv)[["grid_id", "count"]].rename(columns={"count": "real"})
+    df_pred = pd.read_csv(pred_csv)[["grid_id", "count"]].rename(columns={"count": "pred"})
+
+    df = df_real.merge(df_pred, on="grid_id", how="inner")
+    df = df.dropna(subset=["real", "pred"])
+
+    y_true = df["real"].values
+    y_pred = df["pred"].values
+
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+
+    print(f"MAE  (Mean Absolute Error): {mae:.3f}")
+    print(f"RMSE (Root Mean Squared Error): {rmse:.3f}")
+
+    return {
+        "MAE": mae,
+        "RMSE": rmse,
+    }
 
 # =========================
 # PIPELINES
@@ -46,49 +79,6 @@ def ml_pipeline():
     train_rf()
     predict_rf()
 
-def _print_similarity_and_error(real_csv: str, pred_csv: str, value_col: str = "count", topk: int = 10):
-    real = pd.read_csv(real_csv)[["grid_id", value_col]].rename(columns={value_col: "real"})
-    pred = pd.read_csv(pred_csv)[["grid_id", value_col]].rename(columns={value_col: "pred"})
-
-    df = real.merge(pred, on="grid_id", how="inner").dropna()
-    if len(df) == 0:
-        print("[WARN] 실제/예측 공통 grid_id가 없습니다.")
-        return
-
-    y = df["real"].to_numpy(dtype=float)
-    yhat = df["pred"].to_numpy(dtype=float)
-
-    err = yhat - y
-    mae = float(np.mean(np.abs(err)))
-    rmse = float(np.sqrt(np.mean(err ** 2)))
-
-    # 오차율(MAPE): real=0인 곳은 제외
-    denom_mask = np.abs(y) > 1e-12
-    if np.any(denom_mask):
-        mape = float(np.mean(np.abs((yhat[denom_mask] - y[denom_mask]) / y[denom_mask])) * 100.0)
-    else:
-        mape = float("nan")
-
-    # 유사도(상관계수)
-    if np.std(y) < 1e-12 or np.std(yhat) < 1e-12:
-        corr = float("nan")
-    else:
-        corr = float(np.corrcoef(y, yhat)[0, 1])
-
-    # Top-K 겹침(랭킹 유사)
-    top_real = set(df.sort_values("real", ascending=False).head(topk)["grid_id"].tolist())
-    top_pred = set(df.sort_values("pred", ascending=False).head(topk)["grid_id"].tolist())
-    jaccard = float(len(top_real & top_pred) / max(1, len(top_real | top_pred)))
-
-    print("\n===== PRED vs REAL (12월) 유사도/오차 =====")
-    print(f"- 공통 격자 수: {len(df)}")
-    print(f"- MAE : {mae:.4f}")
-    print(f"- RMSE: {rmse:.4f}")
-    print(f"- 오차율(MAPE): {mape:.2f}%")
-    print(f"- 피어슨 상관계수: {corr:.4f}")
-    print(f"- Top-{topk} Jaccard(겹침 유사도): {jaccard:.4f}")
-    print("========================================\n")
-
 def map_pipeline():
     print("\n=== MAP PIPELINE ===")
 
@@ -99,7 +89,7 @@ def map_pipeline():
             out_html=f"map/grid_heatmap_200m_{m}.html",
         )
 
-    # ✅ 12월 실제/예측 공통 스케일 계산
+    # ✅ 12월 실제/예측 공통 스케일 계산+  
     real_csv = "data/predata_12.csv"
     pred_csv = "data/pred_12.csv"
 
@@ -110,9 +100,6 @@ def map_pipeline():
     combined = pd.concat([df_real["real"], df_pred["pred"]], axis=0).dropna()
     scale_vmin = float(combined.min())
     scale_vmax = float(combined.max())
-
-    # ✅ 터미널에 유사도/오차율 출력
-    _print_similarity_and_error(real_csv, pred_csv, value_col="count", topk=10)
 
     # 2️⃣ 실제 12월 (✅ 동일 스케일 적용)
     make_grid_heatmap_html(
@@ -174,13 +161,14 @@ if __name__ == "__main__":
         print("3. model testing")
         print("4. result analization")
         print("5. vizualization")
-        print("6. all")
-        print("7. exit")
+        print("6. error check")
+        print("7. all")
+        print("8. exit")
         print("=======================")
         command = input("원하시는 작업의 번호를 눌러주세요: ")
         return command
     command = printing()
-    while(command != "7"):
+    while(command != "8"):
         if command == "1":
             geo_pipeline()
             command = printing()
@@ -197,11 +185,15 @@ if __name__ == "__main__":
             map_pipeline()
             command = printing()
         elif command == "6":
+            error_check()
+            command = printing()
+        elif command == "7":
             geo_pipeline()
             grid_pipeline()
             ml_pipeline()
             analysis_pipeline()
             map_pipeline()
+            error_check()
             command = printing()
         else:
             print("please enter the right number of the command")
